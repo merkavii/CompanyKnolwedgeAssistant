@@ -1,33 +1,58 @@
 from src.core.models import Document, DocumentMetadata
 from src.document_processor.chunker import TextChunker
+from src.retrieval.embedder import DocumentEmbedder
+from src.retrieval.vector_store import InMemoryVectorStore
 
 def run_test():
-    # ۱. ساخت یک داکیومنت فرضی با متادیتا
-    dummy_text = (
-        "This is a sample company policy. " * 20 + 
-        "Only managers can approve remote work. " * 10
+    print("Loading embedding model (this may take a moment to download on first run)...")
+    embedder = DocumentEmbedder()
+    vector_store = InMemoryVectorStore()
+    chunker = TextChunker(chunk_size=200, chunk_overlap=20)
+    
+    # 1. ساخت اسناد نمونه
+    doc1 = Document(
+        content="The company cafeteria is open from 12 PM to 2 PM. We serve vegetarian options.",
+        metadata=DocumentMetadata(source_file="general_info.txt", allowed_roles=["employee", "manager"])
+    )
+    doc2 = Document(
+        content="Project X is highly confidential. The launch date is set for November 2026.",
+        metadata=DocumentMetadata(source_file="secret_project.txt", allowed_roles=["manager"]) # فقط مدیران
     )
     
-    metadata = DocumentMetadata(
-        source_file="hr_policy_test.txt",
-        allowed_roles=["employee", "manager"]
-    )
+    # 2. چانک کردن و تولید امبدینگ
+    all_chunks = chunker.split_document(doc1) + chunker.split_document(doc2)
+    chunk_texts = [chunk.text for chunk in all_chunks]
     
-    doc = Document(content=dummy_text, metadata=metadata)
+    print(f"Embedding {len(all_chunks)} chunks...")
+    embeddings = embedder.embed_batch(chunk_texts)
     
-    # ۲. راه‌اندازی Chunker با سایز کوچک برای تست
-    chunker = TextChunker(chunk_size=150, chunk_overlap=20)
+    # 3. ذخیره در وکتور استور
+    vector_store.add_chunks(all_chunks, embeddings)
     
-    # ۳. قطعه‌بندی متن
-    chunks = chunker.split_document(doc)
+    # 4. تست سناریوی جست‌وجو
+    query = "When does the cafeteria open?"
+    print(f"\nQuery: {query}")
+    query_emb = embedder.embed_text(query)
     
-    # ۴. نمایش نتایج
-    print(f"Total chunks created: {len(chunks)}\n")
-    for i, chunk in enumerate(chunks[:3]): # چاپ ۳ قطعه اول
-        print(f"--- Chunk {i+1} (ID: {chunk.id[:8]}...) ---")
-        print(f"Text length: {len(chunk.text)}")
-        print(f"Allowed roles: {chunk.metadata.allowed_roles}")
-        print(f"Content: {chunk.text}\n")
+    print("\n--- Test 1: Employee Search (Normal Access) ---")
+    results = vector_store.search(query_emb, top_k=2, allowed_roles=["employee"])
+    for chunk, score in results:
+        print(f"Score: {score:.3f} | File: {chunk.metadata.source_file} | Text: {chunk.text}")
+        
+    print("\n--- Test 2: Manager Searching for Secret Project ---")
+    query2 = "What is the launch date for Project X?"
+    query2_emb = embedder.embed_text(query2)
+    results2 = vector_store.search(query2_emb, top_k=2, allowed_roles=["manager"])
+    for chunk, score in results2:
+        print(f"Score: {score:.3f} | File: {chunk.metadata.source_file} | Text: {chunk.text}")
+        
+    print("\n--- Test 3: Employee Searching for Secret Project (Should be BLOCKED) ---")
+    results3 = vector_store.search(query2_emb, top_k=2, allowed_roles=["employee"])
+    if not results3:
+        print("Blocked successfully! No results found for employee.")
+    else:
+        for chunk, score in results3:
+            print(f"Score: {score:.3f} | Text: {chunk.text}")
 
 if __name__ == "__main__":
     run_test()
