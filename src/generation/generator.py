@@ -1,50 +1,49 @@
-import os
 from openai import OpenAI
 from typing import List
 from src.core.models import Chunk
+from src.core.settings import settings # اضافه شدن مدیریت متمرکز تنظیمات
 
 class AnswerGenerator:
-    def __init__(self, model_name: str = "gpt-4o-mini"):
-        # کلید API به صورت خودکار از متغیرهای محیطی یا فایل .env خوانده می‌شود
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY is not set in the environment variables.")
-            
-        self.client = OpenAI(api_key=api_key)
+    def __init__(self, model_name: str = "qwen/qwen3.8-27b"):
+        # خواندن API Key به صورت Type-Safe از کلاس Settings
+        self.client = OpenAI(
+            api_key=settings.GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1"
+        )
         self.model = model_name
 
     def generate_answer(self, query: str, retrieved_chunks: List[Chunk]) -> str:
-        # اگر در مرحله Retrieval هیچ سندی پیدا نشد، اصلاً به LLM درخواست نمی‌دهیم
+        # بررسی وجود داکیومنت قبل از ارسال به مدل
         if not retrieved_chunks:
-            return "I cannot answer this question because I don't have access to relevant documents or no matching information was found."
+            return "I could not find the answer in the provided documents or you do not have permission to view them."
 
-        # آماده‌سازی Context از روی Chunkهای بازیابی‌شده
+        # ساخت ساختار متنی از قطعات بازیابی‌شده به همراه نام فایل برای ارجاع‌دهی
         context_parts = []
         for i, chunk in enumerate(retrieved_chunks):
-            # نام فایل را صریحاً به مدل می‌دهیم تا بتواند Citation کند
-            context_parts.append(f"--- Document {i+1} ---\n{chunk.text}\n")
+            context_parts.append(f"--- Document: {chunk.metadata.source_file} ---\n{chunk.text}\n")
         
         context_text = "\n".join(context_parts)
 
-        # Prompt مهندسی‌شده برای جلوگیری از توهم
+        # پرامپت سیستمی برای محدود کردن مدل به متن و جلوگیری از توهم
         system_prompt = (
             "You are a highly strictly professional Company Knowledge Assistant. "
             "Your task is to answer the user's question ONLY using the provided context documents. "
             "Follow these rules strictly:\n"
             "1. If the answer cannot be deduced from the provided context, explicitly output exactly: 'I could not find the answer in the provided documents.' Do not guess.\n"
-            "2. Always include inline citations referring to the source file name (e.g.,).\n"
-            "3. Do not use outside knowledge."
+            "2. Always include inline citations referring to the exact source file name provided in the context.\n"
+            "3. Do not use any outside knowledge."
         )
 
         user_prompt = f"Context documents:\n{context_text}\n\nQuestion: {query}"
 
+        # فراخوانی API با دمای صفر برای دریافت قطعی‌ترین پاسخ
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.0 # روی صفر تنظیم می‌کنیم تا کمترین توهم را داشته باشد
+            temperature=0.0
         )
         
         return response.choices[0].message.content

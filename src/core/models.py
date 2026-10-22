@@ -14,3 +14,6 @@ class Chunk(BaseModel):
 class Document(BaseModel):
     content: str
     metadata: DocumentMetadata
+    
+# python -m venv venv --system-site-packages
+# .\venv\Scripts\activate

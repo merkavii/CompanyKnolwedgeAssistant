@@ -2,57 +2,65 @@ from src.core.models import Document, DocumentMetadata
 from src.document_processor.chunker import TextChunker
 from src.retrieval.embedder import DocumentEmbedder
 from src.retrieval.vector_store import InMemoryVectorStore
+from src.generation.generator import AnswerGenerator
 
 def run_test():
-    print("Loading embedding model (this may take a moment to download on first run)...")
+    print("Initializing components (Embedding model, Vector DB, LLM Generator)...")
+    
+    # نمونه‌سازی از تمام کلاس‌های پایه‌ای که تا الان ساختیم
     embedder = DocumentEmbedder()
     vector_store = InMemoryVectorStore()
     chunker = TextChunker(chunk_size=200, chunk_overlap=20)
+    generator = AnswerGenerator() # اینجا API Key به صورت خودکار از Settings خوانده می‌شود
     
-    # 1. ساخت اسناد نمونه
+    # ۱. شبیه‌سازی اسناد شرکت و متادیتاها (ایجاد دیتابیس دانشی)
     doc1 = Document(
-        content="The company cafeteria is open from 12 PM to 2 PM. We serve vegetarian options.",
-        metadata=DocumentMetadata(source_file="general_info.txt", allowed_roles=["employee", "manager"])
+        content="Employees can take up to 3 days of paid emergency leave per year. Manager approval is required in writing.",
+        metadata=DocumentMetadata(source_file="hr_leave_policy_2026.pdf", allowed_roles=["employee", "manager"])
     )
     doc2 = Document(
-        content="Project X is highly confidential. The launch date is set for November 2026.",
-        metadata=DocumentMetadata(source_file="secret_project.txt", allowed_roles=["manager"]) # فقط مدیران
+        content="The server root password is 'Admin@123!'. This is strictly for the DevOps team.",
+        metadata=DocumentMetadata(source_file="it_security.txt", allowed_roles=["devops"])
     )
     
-    # 2. چانک کردن و تولید امبدینگ
+    # ۲. تبدیل اسناد به Chunk (قطعه‌بندی)
     all_chunks = chunker.split_document(doc1) + chunker.split_document(doc2)
     chunk_texts = [chunk.text for chunk in all_chunks]
     
-    print(f"Embedding {len(all_chunks)} chunks...")
+    print("Embedding chunks and storing in Vector Database...")
+    # ۳. تبدیل متن‌ها به بردار ریاضی و ذخیره در دیتابیس حافظه‌ای
     embeddings = embedder.embed_batch(chunk_texts)
-    
-    # 3. ذخیره در وکتور استور
     vector_store.add_chunks(all_chunks, embeddings)
     
-    # 4. تست سناریوی جست‌وجو
-    query = "When does the cafeteria open?"
-    print(f"\nQuery: {query}")
-    query_emb = embedder.embed_text(query)
+    # ۴. تابع کمکی برای شبیه‌سازی کامل یک درخواست از سمت کاربر
+    def ask_question(query: str, user_roles: list[str]):
+        print(f"\n[User Role: {user_roles}] Query: {query}")
+        
+        # الف: تبدیل سوال کاربر به بردار
+        query_emb = embedder.embed_text(query)
+        
+        # ب: جست‌وجو در دیتابیس (فیلتر شده بر اساس نقش کاربر و Threshold)
+        retrieved_chunks = vector_store.search(
+            query_embedding=query_emb, 
+            top_k=2, 
+            allowed_roles=user_roles,
+            score_threshold=0.3  # فقط نتایج مرتبط را برمی‌گرداند
+        )
+        
+        # ج: ارسال سوال و نتایج فیلترشده به مدل زبانی (LLM) برای تولید پاسخ انسانی
+        answer = generator.generate_answer(query, [chunk for chunk, score in retrieved_chunks])
+        print(f"Assistant: {answer}")
+
+    print("\n" + "="*50)
     
-    print("\n--- Test 1: Employee Search (Normal Access) ---")
-    results = vector_store.search(query_emb, top_k=2, allowed_roles=["employee"])
-    for chunk, score in results:
-        print(f"Score: {score:.3f} | File: {chunk.metadata.source_file} | Text: {chunk.text}")
-        
-    print("\n--- Test 2: Manager Searching for Secret Project ---")
-    query2 = "What is the launch date for Project X?"
-    query2_emb = embedder.embed_text(query2)
-    results2 = vector_store.search(query2_emb, top_k=2, allowed_roles=["manager"])
-    for chunk, score in results2:
-        print(f"Score: {score:.3f} | File: {chunk.metadata.source_file} | Text: {chunk.text}")
-        
-    print("\n--- Test 3: Employee Searching for Secret Project (Should be BLOCKED) ---")
-    results3 = vector_store.search(query2_emb, top_k=2, allowed_roles=["employee"])
-    if not results3:
-        print("Blocked successfully! No results found for employee.")
-    else:
-        for chunk, score in results3:
-            print(f"Score: {score:.3f} | Text: {chunk.text}")
+    # سناریو ۱: کارمند عادی درباره مرخصی می‌پرسد (باید جواب دقیق با Citation فایل بدهد)
+    ask_question("How many days of emergency leave can I take?", ["employee"])
+    
+    # سناریو ۲: کارمند عادی رمز سرور را می‌پرسد (فیلتر RBAC سند را مسدود می‌کند، LLM باید بگوید نمی‌دانم)
+    ask_question("What is the server root password?", ["employee"])
+    
+    # سناریو ۳: سوالی که اصلا در اسناد نیست (فیلتر Threshold اسناد نامرتبط را حذف می‌کند، LLM باید بگوید پیدا نکردم)
+    ask_question("Does the company provide free lunch?", ["employee"])
 
 if __name__ == "__main__":
     run_test()
