@@ -1,7 +1,7 @@
 from src.core.models import Document, DocumentMetadata
 from src.document_processor.chunker import TextChunker
 from src.retrieval.embedder import DocumentEmbedder
-from src.retrieval.vector_store import InMemoryVectorStore
+from src.retrieval.vector_store import LocalPersistentVectorStore
 from src.generation.generator import AnswerGenerator
 
 def run_test():
@@ -9,7 +9,7 @@ def run_test():
     
     # نمونه‌سازی از تمام کلاس‌های پایه‌ای که تا الان ساختیم
     embedder = DocumentEmbedder()
-    vector_store = InMemoryVectorStore()
+    vector_store = LocalPersistentVectorStore()
     chunker = TextChunker(chunk_size=200, chunk_overlap=20)
     generator = AnswerGenerator() # اینجا API Key به صورت خودکار از Settings خوانده می‌شود
     

@@ -1,0 +1,20 @@
+[
+  {
+    "question": "How many days of emergency leave are allowed?",
+    "expected_source_file": "hr_leave_policy_2026.pdf",
+    "required_text_snippet": "up to 3 days of paid emergency leave",
+    "user_roles": ["employee"]
+  },
+  {
+    "question": "Who can approve remote work?",
+    "expected_source_file": "hr_policy_test.txt",
+    "required_text_snippet": "Only managers can approve remote work",
+    "user_roles": ["employee"]
+  },
+  {
+    "question": "What is the password for the server?",
+    "expected_source_file": "it_security.txt",
+    "required_text_snippet": "Admin@123!",
+    "user_roles": ["devops"]
+  }
+]

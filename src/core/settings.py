@@ -5,6 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     GROQ_API_KEY: str
     
+    DATABASE_URL: str
+    
     # به Pydantic می‌گوییم فایل .env را از مسیر اصلی پروژه بخواند
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

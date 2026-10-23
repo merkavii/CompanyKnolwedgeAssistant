@@ -1,0 +1,35 @@
+[
+  {
+    "id": "0404ddd7-8892-4dd2-886b-2e715e82ca52",
+    "text": "Employees can take up to 3 days of paid emergency leave per year. Manager approval is required in writing.",
+    "metadata": {
+      "source_file": "hr_leave_policy_2026.pdf",
+      "allowed_roles": [
+        "employee",
+        "manager"
+      ]
+    }
+  },
+  {
+    "id": "3e09635d-2241-4ba6-a9c0-a748f1f27766",
+    "text": "Standard working hours are 9 AM to 5 PM. Only managers can approve remote work.",
+    "metadata": {
+      "source_file": "hr_policy_test.txt",
+      "allowed_roles": [
+        "employee",
+        "manager"
+      ]
+    }
+  },
+  {
+    "id": "56b0a1e2-8c89-415d-b942-495286a1710e",
+    "text": "The server root password is 'Admin@123!'. This is strictly for the DevOps team.",
+    "metadata": {
+      "source_file": "it_security.txt",
+      "allowed_roles": [
+        "devops",
+        "manager"
+      ]
+    }
+  }
+]
